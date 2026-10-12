@@ -1,47 +1,27 @@
-import React from 'react'
-import { Badge } from '@chakra-ui/react'
-
-const ReviewAnswerBox = ({ question, options, category, num, myAnswer, rightAnswer }) => {
-
-    let i = -1
-    const alphabet = ['A', 'B', 'C', 'D']
-
-    return (
-        <>
-            <div className="q-box mx-auto my-5 p-4 text-center">
-                <div className="q-box_head">
-                    <div className="q-box_timer">{num}</div>
-                    <div className="q-question" dangerouslySetInnerHTML={{ __html: question }}></div>
-                </div>
-                <div className="q-box_body">
-                    {
-                        options.map((index) => {
-                            let tempClass = ''
-                            let tempIcon = ''
-                            if (index === rightAnswer) {
-                                tempClass = 'right'
-                                tempIcon = 'rightIcon'
-                            } else if (myAnswer !== rightAnswer) {
-                                tempClass = 'wrong'
-                                tempIcon = 'wrongIcon'
-                            } else {
-                                tempClass = ''
-                                tempIcon = ''
-                            }
-
-                            i++;
-                            return <div key={index} className={`q-box_options ${tempClass}`}>
-                                <div className={`option-icon ${tempIcon}`}>{alphabet[i]}</div> <div dangerouslySetInnerHTML={{ __html: index }}></div>
-                            </div>
-                        })
-                    }
-                </div>
-                <div className="d-flex flex-wrap justify-content-center align-items-center mx-3">
-                    <Badge colorScheme='purple'>{category}</Badge>
-                </div>
-            </div>
-        </>
-    )
+import AnswerOptions from "../QuestionBox/AnswerOptions";
+export default function ReviewAnswerBox({ question, answer, number }) {
+  return (
+    <article className="review-question">
+      <div className="question-meta">
+        <span>
+          Question {number} · {question.category}
+        </span>
+        <span className={`review-result ${answer.result}`}>
+          {answer.result === "unanswered"
+            ? "Unanswered"
+            : answer.result === "correct"
+              ? "Correct"
+              : "Incorrect"}
+          {answer.reason === "timeout" ? " (time expired)" : ""}
+        </span>
+      </div>
+      <h2>{question.question}</h2>
+      <AnswerOptions
+        options={question.options}
+        selectedId={answer.selectedId}
+        correctId={question.correctId}
+        review
+      />
+    </article>
+  );
 }
-
-export default ReviewAnswerBox;

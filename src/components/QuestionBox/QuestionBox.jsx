@@ -1,102 +1,136 @@
-import React, { useContext, useEffect, useState } from 'react'
-import './QuestionBox.css'
-import { Badge } from '@chakra-ui/react'
-import quizContext from '../../context/quizContext'
-import clickAudio from './../../Assets/select-sound.mp3'
+import { useContext, useEffect, useRef, useState } from "react";
+import quizContext from "../../context/quizContext";
+import AnswerOptions from "./AnswerOptions";
+import clickAudio from "../../Assets/select-sound.mp3";
 
-// #0b4b06 - bg
-// #53a24db5 - border
-const audio = new Audio(clickAudio);
-
-const QuestionBox = (props) => {
-
-    const [selectedAns, setSelectedAns] = useState('')
-    const context = useContext(quizContext)
-    const { setScore, score, next, setNext, len, answerList, setAnswerList } = context
-    const { question, options, category } = props
-    //Here options[0] = options array and options[1] = correct answer
-    let i = -1
-    const alphabet = ['A', 'B', 'C', 'D']
-    // let currentAlpha = ''
-
-    const removeClass = () => {
-        let element = document.getElementsByClassName('q-box_body')
-        for (let i = 0; i < element.length; i++) {
-            for (let j = 0; j < element[i].children.length; j++) {
-                element[i].children[j].classList.remove('optionSelected')
-            }
-        }
+export default function QuestionBox() {
+  const { attempt, dispatch, settings, setSettings } = useContext(quizContext);
+  const question = attempt.questions[attempt.index];
+  const [seconds, setSeconds] = useState(() =>
+    attempt.deadline
+      ? Math.max(0, Math.ceil((attempt.deadline - Date.now()) / 1000))
+      : null,
+  );
+  const heading = useRef(null);
+  const audio = useRef(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, [question.id]);
+  useEffect(() => {
+    if (!attempt.deadline) return;
+    const tick = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((attempt.deadline - Date.now()) / 1000),
+      );
+      setSeconds(remaining);
+      if (remaining === 0)
+        dispatch({
+          type: "answer",
+          index: attempt.index,
+          reason: "timeout",
+          now: Date.now(),
+        });
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [attempt.deadline, attempt.index, dispatch]);
+  const select = (id) => {
+    if (attempt.deadline && Date.now() >= attempt.deadline) {
+      dispatch({
+        type: "answer",
+        index: attempt.index,
+        reason: "timeout",
+        now: Date.now(),
+      });
+      return;
     }
-
-    //Update the score 
-    const checkAnswer = (selectedAns) => {
-        if (selectedAns === '') {
-            return true;
-        } else if (selectedAns === options[1]) {
-            setScore({ ...score, 'rightAnswers': score.rightAnswers + 1 })
-        } else {
-            setScore({ ...score, 'wrongAnswers': score.wrongAnswers + 1 })
-        }
+    dispatch({ type: "select", id });
+    if (settings.sound) {
+      if (!audio.current) audio.current = new Audio(clickAudio);
+      audio.current.currentTime = 0;
+      audio.current.play()?.catch(() => {});
     }
-
-    const handleOptionClick = (e) => {
-        audio.play();
-        removeClass()
-        setSelectedAns((e.target.innerText.slice(1)).trim())
-        const currentAlpha = e.target.innerText[0]
-        document.getElementById(currentAlpha).classList.add('optionSelected')
-    }
-
-    const handleNextQuestion = () => {
-        if (next <= len - 1) {
-            checkAnswer(selectedAns)
-            setNext(next + 1)
-            setSelectedAns('')
-        }
-        setAnswerList([...answerList, { 'question': question, 'options': options[0], 'id': `id${next}`, 'category': category, 'myAnswer': selectedAns, 'rightAnswer': options[1] }])
-    }
-
-    // for reverse timer
-    const [timer, setTimer] = useState(30)
-
-    useEffect(() => {
-        let myInterval = setInterval(() => {
-            if (timer > 0) {
-                setTimer(timer - 1)
-            } else {
-                setNext(next + 1)
-            }
-        }, 1000)
-        return () => {
-            clearInterval(myInterval);
-        };
-    })
-
-
-    return (
-        <>
-            <div className="q-box mx-auto my-5 p-4 text-center">
-                <div className="q-box_head">
-                    <div className="q-box_timer">{timer}s</div>
-                    <div className="q-question" dangerouslySetInnerHTML={{ __html: question }}></div>
-                </div>
-                <div className="q-box_body">
-                    {
-                        options[0].map((index) => {
-                            i++;
-                            return <div id={alphabet[i]} key={index} onClick={handleOptionClick} className="q-box_options">
-                                <div className='option-icon'>{alphabet[i]}</div> <div dangerouslySetInnerHTML={{ __html: index }}></div>
-                            </div>
-                        })
-                    }
-                </div>
-                <div className="d-flex flex-wrap justify-content-between align-items-center mx-3">
-                    <Badge colorScheme='purple'>{category}</Badge>
-                    <button onClick={handleNextQuestion} className="btn btn-primary m-2">{(next >= len - 1) ? 'Submit' : 'Next'}</button>
-                </div>
-            </div>
-        </>
-    )
+  };
+  const submit = (skip) => {
+    const expired = attempt.deadline && Date.now() >= attempt.deadline;
+    dispatch({
+      type: "answer",
+      index: attempt.index,
+      skip: expired ? false : skip,
+      reason: expired ? "timeout" : skip ? "skipped" : "submitted",
+      now: Date.now(),
+    });
+  };
+  return (
+    <section className="quiz-shell" aria-label="Current quiz">
+      <div className="quiz-toolbar">
+        <span>
+          Question <strong>{attempt.index + 1}</strong> of{" "}
+          {attempt.questions.length}
+        </span>
+        <button
+          className="text-button"
+          type="button"
+          aria-pressed={settings.sound}
+          onClick={() => setSettings({ ...settings, sound: !settings.sound })}
+        >
+          Sound {settings.sound ? "on" : "off"}
+        </button>
+      </div>
+      <progress
+        value={attempt.index}
+        max={attempt.questions.length}
+        aria-label="Quiz progress"
+      />
+      <div className="question-panel">
+        <div className="question-meta">
+          <div className="tag-row">
+            <span>{question.category}</span>
+            <span className="difficulty">{question.difficulty}</span>
+          </div>
+          {attempt.deadline ? (
+            <span
+              className={`timer ${seconds <= 5 ? "urgent" : ""}`}
+              role="timer"
+              aria-label={`${seconds} seconds remaining`}
+            >
+              {seconds}s
+            </span>
+          ) : (
+            <span className="muted">Untimed</span>
+          )}
+        </div>
+        <h1 className="question-heading" ref={heading} tabIndex={-1}>
+          {question.question}
+        </h1>
+        <AnswerOptions
+          options={question.options}
+          selectedId={attempt.selectedId}
+          onSelect={select}
+        />
+        <div className="question-actions">
+          <button className="text-button" onClick={() => submit(true)}>
+            Skip question
+          </button>
+          <button
+            className="button primary"
+            disabled={attempt.selectedId === null}
+            onClick={() => submit(false)}
+          >
+            {attempt.index === attempt.questions.length - 1
+              ? "Finish quiz"
+              : "Next question"}{" "}
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </div>
+      <p className="quiz-hint">
+        {attempt.deadline
+          ? "Your selected answer is submitted when time runs out."
+          : "Take your time. Choose an answer, then continue."}
+      </p>
+    </section>
+  );
 }
-
-export default QuestionBox

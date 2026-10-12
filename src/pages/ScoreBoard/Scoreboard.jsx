@@ -1,114 +1,108 @@
-import React from 'react'
-import { useContext } from 'react'
-import './Scoreboard.css'
-import { AiOutlineHome, AiOutlineEye } from 'react-icons/ai'
-import { BiReset } from 'react-icons/bi'
-import { BsShare } from 'react-icons/bs'
-import quizContext from '../../context/quizContext'
-import { Link as ReachLink } from 'react-router-dom'
-
-const Scoreboard = (props) => {
-    const context = useContext(quizContext)
-    const { setNext, setScore, setAnswerList } = context
-    const { total_que, correct_que, wrong_que } = props
-    let percentage = (correct_que / total_que) * 100
-    let Attempted = (correct_que + wrong_que) / total_que * 100
-
-    const handleGoHome = () => {
-        window.location.reload()
+import { useContext, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import quizContext from "../../context/quizContext";
+import { summarize, categoryName } from "../../lib/quiz";
+export default function Scoreboard() {
+  const { attempt, goHome, retryQuiz, startQuiz } = useContext(quizContext);
+  const [shareMessage, setShareMessage] = useState("");
+  const [copyText, setCopyText] = useState("");
+  const heading = useRef(null);
+  const stats = summarize(attempt);
+  const percentage = Math.round(
+    (stats.correct / attempt.questions.length) * 100,
+  );
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
+  const share = async () => {
+    const text = `I scored ${stats.correct}/${attempt.questions.length} (${percentage}%) on ${categoryName(attempt.settings.category)} in Dynamic Quiz. Try a round: ${window.location.origin}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "My Dynamic Quiz score", text });
+        setShareMessage("Score shared.");
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setShareMessage("Score copied. Paste it wherever you like.");
+      } else {
+        setCopyText(text);
+        setShareMessage("Select and copy your score below.");
+      }
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        setCopyText(text);
+        setShareMessage("Select and copy your score below.");
+      }
     }
-
-    const handlePlayAgain = () => {
-        setNext(0)
-        setScore({ 'rightAnswers': 0, 'wrongAnswers': 0 })
-        setAnswerList([])
-    }
-    return (
-        <>
-            <div className="main">
-                <div className="score">
-                    Your Score <br />
-                    <span>{percentage.toFixed(2)} <small>%</small></span>
-                </div>
-                <div className="point-table">
-
-                    <div className="semi-table">
-                        <div style={{ backgroundColor: '#A45EDA' }} className="circle"></div>
-                        <div className='mx-2'>
-                             <div className="point-info">
-                                Attempted
-                            </div>
-                            <div style={{ color: '/*#A45EDA*/#fff',width:"5.8rem",background:"#212832",padding:"0.5rem",borderRadius:"0.5rem" }} className="point">{Attempted.toFixed(2)}%</div>
-                            
-                        </div>
-                    </div>
-                    <div className="semi-table">
-                    <div style={{ backgroundColor:'#A45EDA' }} className="circle"></div>
-                        <div className='mx-2'>
-                        <div className="point-info">
-                                Total Questions
-                            </div>
-                            <div style={{ color: '#fff',width:"5.8rem",background:"#212832",padding:"0.5rem",borderRadius:"0.5rem"  }} className="point">{total_que}</div>
-                           
-                        </div>
-                    </div>
-                    <div className="semi-table">
-                        <div style={{ backgroundColor: 'rgb(6 143 86)' }} className="circle"></div>
-                        <div className='mx-2'>
-                        <div className="point-info">
-                                Correct
-                            </div>
-                            <div style={{ color: '/*rgb(6 143 86)*/#fff',background:"#212832",padding:"0.5rem",width:"5.8rem",borderRadius:"0.5rem"  }} className="point">{correct_que}</div>
-                           
-                        </div>
-                    </div>
-                    <div className="semi-table">
-                        <div style={{ backgroundColor: 'rgb(223 75 75)' }} className="circle"></div>
-                        <div className='mx-2'>
-                            <div className="point-info">
-                                Wrong
-                            </div>
-                            <div style={{ color: '/*rgb(223 75 75)*/#fff',width:"5.8rem",background:"#212832",padding:"0.5rem",borderRadius:"0.5rem"  }} className="point">{wrong_que}</div>
-                          
-                        </div>
-                    </div>
-
-                </div>
-
-                <div className="footer">
-                    <div className="text-center" onClick={handleGoHome}>
-                        <div style={{ backgroundColor: '#BE709F' }} className="home-btn">
-                            <AiOutlineHome />
-                        </div>
-                        <div className='footer-text'>Home</div>
-                    </div>
-                    <div className="text-center">
-                        <div style={{ backgroundColor: '#755ED3' }} className="home-btn">
-                            <BsShare />
-                        </div>
-                        <div className='footer-text'>Share Score</div>
-                    </div>
-                    <div className="text-center">
-                        <ReachLink to='/review'>
-                            <div style={{ backgroundColor: '#BF8D6F' }} className="home-btn">
-                                <AiOutlineEye />
-                            </div>
-                        </ReachLink>
-                        <div className='footer-text'>
-                            Review Answer
-                        </div>
-                    </div>
-                    <div className="text-center" onClick={handlePlayAgain}>
-                        <div style={{ backgroundColor: '#5492B3' }} className="home-btn">
-                            <BiReset />
-                        </div>
-                        <div className='footer-text'>Play Again</div>
-                    </div>
-                </div>
-            </div>
-
-        </>
-    )
+  };
+  return (
+    <section className="results-shell">
+      <p className="eyebrow">Round complete</p>
+      <h1 ref={heading} tabIndex={-1}>
+        {percentage >= 80
+          ? "Nicely done."
+          : percentage >= 50
+            ? "Keep that curiosity going."
+            : "Every round is a fresh start."}
+      </h1>
+      <p className="muted">
+        {categoryName(attempt.settings.category)} ·{" "}
+        {attempt.settings.difficulty || "Mixed difficulty"}
+      </p>
+      <div className="result-score">
+        <strong>
+          {percentage}
+          <span>%</span>
+        </strong>
+        <p>
+          {stats.correct} of {attempt.questions.length} correct
+        </p>
+      </div>
+      <dl className="score-breakdown">
+        <div>
+          <dt>Correct</dt>
+          <dd>{stats.correct}</dd>
+        </div>
+        <div>
+          <dt>Incorrect</dt>
+          <dd>{stats.incorrect}</dd>
+        </div>
+        <div>
+          <dt>Unanswered</dt>
+          <dd>{stats.unanswered}</dd>
+        </div>
+      </dl>
+      <div className="results-actions">
+        <Link className="button primary" to="/review">
+          Review answers <span aria-hidden="true">→</span>
+        </Link>
+        <button
+          className="button secondary"
+          onClick={() => startQuiz(attempt.settings)}
+        >
+          New quiz, same settings
+        </button>
+        <button className="text-button" onClick={retryQuiz}>
+          Retry these questions
+        </button>
+        <button className="text-button" onClick={share}>
+          Share score
+        </button>
+        <button className="text-button" onClick={goHome}>
+          Back to home
+        </button>
+      </div>
+      <p className="share-status" role="status">
+        {shareMessage}
+      </p>
+      {copyText && (
+        <textarea
+          className="share-copy"
+          aria-label="Score to copy"
+          readOnly
+          value={copyText}
+          onFocus={(e) => e.target.select()}
+        />
+      )}
+    </section>
+  );
 }
-
-export default Scoreboard
